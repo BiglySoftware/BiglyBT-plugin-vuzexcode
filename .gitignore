@@ -5,3 +5,8 @@
 /mediainfo
 /mediainfo.exe
 /vzspath.exe
+*.jar
+*.class
+*.zip
+*.biglybt
+

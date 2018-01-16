@@ -41,8 +41,6 @@ public class
 TranscoderPlugin 
 	implements UnloadablePlugin
 {
-	private static final int HTTP_READ_TIMEOUT = 3*60*1000;
-	
 	private TranscoderProfileProvider provider;
 	
 	private LoggerChannel			logger;
@@ -55,6 +53,7 @@ TranscoderPlugin
 	
 	private IntParameter		analysis_start_chunk;
 	private IntParameter		analysis_end_chunk;
+	private IntParameter		http_timeout_mins;
 	
 	private int					threads;
 	
@@ -222,8 +221,8 @@ TranscoderPlugin
 				
 		BooleanParameter enable_menus = config_model.addBooleanParameter2( "vuzexcode.enable_menus", "vuzexcode.enable_menus", false );
 		
-		analysis_start_chunk 	= config_model.addIntParameter2( "vuzexcode.analysis_start", "vuzexcode.analysis_start", 128, 0, Integer.MAX_VALUE );
-		analysis_end_chunk 		= config_model.addIntParameter2( "vuzexcode.analysis_end", "vuzexcode.analysis_end", 128, 0, Integer.MAX_VALUE );
+		analysis_start_chunk 	= config_model.addIntParameter2( "vuzexcode.analysis_start", "vuzexcode.analysis_start", 128, 32, Integer.MAX_VALUE );
+		analysis_end_chunk 		= config_model.addIntParameter2( "vuzexcode.analysis_end", "vuzexcode.analysis_end", 128, 32, Integer.MAX_VALUE );
 
 		int procs = Runtime.getRuntime().availableProcessors();
 		
@@ -255,6 +254,9 @@ TranscoderPlugin
 			
 			threads = 1;
 		}
+		
+		http_timeout_mins 		= config_model.addIntParameter2( "vuzexcode.analysis_timeout", "vuzexcode.analysis_timeout", 3, 1, Integer.MAX_VALUE );
+
 		
 		if ( enable_menus.getValue()){
 			
@@ -734,6 +736,8 @@ TranscoderPlugin
 						
 						result.put( "xcode_required", true );
 						
+						int	http_timeout = http_timeout_mins.getValue() * 60* 1000;
+						
 						try{
 							MediaInformation info = null;
 						
@@ -762,7 +766,7 @@ TranscoderPlugin
 											
 											HttpURLConnection connection = (HttpURLConnection)input_url.openConnection();
 										
-											connection.setReadTimeout( HTTP_READ_TIMEOUT );
+											connection.setReadTimeout( http_timeout );
 											
 											connection.setRequestMethod( "HEAD" );
 											
@@ -783,7 +787,7 @@ TranscoderPlugin
 										
 										HttpURLConnection connection = (HttpURLConnection)input_url.openConnection();
 		
-										connection.setReadTimeout( HTTP_READ_TIMEOUT );
+										connection.setReadTimeout( http_timeout );
 										
 										if ( source_length > 0 && source_length > START_OF_FILE_CHUNK ){
 											
@@ -885,7 +889,7 @@ TranscoderPlugin
 											
 											connection = (HttpURLConnection)input_url.openConnection();
 											
-											connection.setReadTimeout( HTTP_READ_TIMEOUT );
+											connection.setReadTimeout( http_timeout );
 											
 											connection.setRequestProperty( "range", "bytes=" + (source_length-END_OF_FILE_CHUNK) + "-" );
 											

@@ -1,17 +1,14 @@
 package com.vuze.transcoder.media;
 
 import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileReader;
+
 import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.util.Properties;
 
 
 import com.vuze.plugins.transcoder.TranscoderPlugin;
 import com.vuze.transcoder.TranscodingException;
-import com.vuze.transcoder.devices.DeviceSpecification;
-import com.vuze.transcoder.devices.DeviceSpecificationFinder;
+
 
 public class MediaAnalyser {
 	
@@ -102,16 +99,16 @@ public class MediaAnalyser {
 			InputStream is = analyser_process.getInputStream();
 			BufferedReader br = new BufferedReader(new InputStreamReader(is));
 			String line = null;
+			String last_line = null;
+			
 			while( (line = br.readLine()) != null) {
-				if(line.startsWith("Complete name") || line.startsWith("Folder name") || line.startsWith("File name")) {
-					int pos = line.indexOf(": ");
-					if(pos > 0) {
-						line = line.substring(pos+2);
-						line = line + "---";
-					}
+				
+				if ( line.equals( last_line )){
+					continue;
 				}
+				last_line = line;
 				sb.append(line);
-				sb.append("\n");
+				sb.append("\r\n");
 			}
 		} catch(Exception e) {
 			

@@ -12,6 +12,7 @@ import com.biglybt.pif.*;
 import com.biglybt.pif.disk.DiskManagerFileInfo;
 import com.biglybt.pif.download.Download;
 import com.biglybt.pif.ipc.IPCException;
+import com.biglybt.pif.ipc.IPCInterface;
 import com.biglybt.pif.logging.LoggerChannel;
 import com.biglybt.pif.logging.LoggerChannelListener;
 import com.biglybt.pif.ui.UIManager;
@@ -25,10 +26,15 @@ import com.biglybt.pif.ui.tables.TableContextMenuItem;
 import com.biglybt.pif.ui.tables.TableManager;
 import com.biglybt.pif.ui.tables.TableRow;
 import com.biglybt.pif.utils.LocaleUtilities;
+import com.biglybt.ui.swt.TextViewerWindow;
 import com.biglybt.ui.swt.Utils;
 
 import com.biglybt.core.devices.DeviceManager;
 import com.biglybt.core.devices.DeviceManagerFactory;
+import com.biglybt.core.devices.TranscodeException;
+
+import com.biglybt.core.download.DiskManagerFileInfoURL;
+import com.biglybt.core.internat.MessageText;
 import com.biglybt.core.proxy.AEProxySelectorFactory;
 import com.biglybt.core.util.average.Average;
 import com.biglybt.core.util.average.AverageFactory;
@@ -50,7 +56,8 @@ TranscoderPlugin
 	private TableContextMenuItem itemTranscodeFiles;
 	private TableContextMenuItem itemTranscodeMyTorrentsBig;
 	private TableContextMenuItem itemTranscodeMyTorrentsComplete;
-	
+	private TableContextMenuItem itemMediaInfo;
+
 	private IntParameter		analysis_start_chunk;
 	private IntParameter		analysis_end_chunk;
 	private IntParameter		http_timeout_mins;
@@ -63,6 +70,7 @@ TranscoderPlugin
 	private File	temp_dir;
 	
 	private Set<analysisContext> 	active_analysis 	= new HashSet<analysisContext>();
+	private Set<analysisContext2> 	active_analysis2 	= new HashSet<analysisContext2>();
 	private Set<transcodeContext> 	active_transcode 	= new HashSet<transcodeContext>();
 	
 	private boolean	plugin_unloading;
@@ -107,6 +115,7 @@ TranscoderPlugin
 				closedownInitiated()
 				{
 					Set<analysisContext> 	analysis;
+					Set<analysisContext2> 	analysis2;
 					Set<transcodeContext> 	transcode;
 
 					synchronized( TranscoderPlugin.this ){
@@ -114,10 +123,16 @@ TranscoderPlugin
 						plugin_closing	= true;
 						
 						analysis 	= new HashSet<analysisContext>( active_analysis );
+						analysis2 	= new HashSet<analysisContext2>( active_analysis2 );
 						transcode	= new HashSet<transcodeContext>( active_transcode );
 					}
 					
 					for ( analysisContext a: analysis ){
+						
+						a.cancel();
+					}
+					
+					for ( analysisContext2 a: analysis2 ){
 						
 						a.cancel();
 					}
@@ -263,9 +278,11 @@ TranscoderPlugin
 			itemTranscodeFiles = pluginInterface.getUIManager().getTableManager().addContextMenuItem(TableManager.TABLE_TORRENT_FILES, "vuzexcode.transcode");
 			itemTranscodeFiles.setStyle(MenuItem.STYLE_MENU);
 			itemTranscodeFiles.setHeaderCategory(MenuItem.HEADER_CONTENT);
+			
 			itemTranscodeMyTorrentsBig = pluginInterface.getUIManager().getTableManager().addContextMenuItem(TableManager.TABLE_MYTORRENTS_ALL_BIG, "vuzexcode.transcode");
 			itemTranscodeMyTorrentsBig.setStyle(MenuItem.STYLE_MENU);
 			itemTranscodeMyTorrentsBig.setHeaderCategory(MenuItem.HEADER_CONTENT);
+			
 			itemTranscodeMyTorrentsComplete = pluginInterface.getUIManager().getTableManager().addContextMenuItem(TableManager.TABLE_MYTORRENTS_COMPLETE, "vuzexcode.transcode");
 			itemTranscodeMyTorrentsComplete.setStyle(MenuItem.STYLE_MENU);
 			itemTranscodeMyTorrentsComplete.setHeaderCategory(MenuItem.HEADER_CONTENT);
@@ -280,8 +297,161 @@ TranscoderPlugin
 					}
 				});
 			}
-			
 		}
+	
+		itemMediaInfo = pluginInterface.getUIManager().getTableManager().addContextMenuItem(
+				TableManager.TABLE_TORRENT_FILES, "vuzexcode.menu.file.mediainfo");
+
+		itemMediaInfo.addMultiListener(
+			new MenuItemListener(){
+				
+				@Override
+				public void selected(MenuItem menu, Object target){
+					
+					TextViewerWindow viewer =
+							new TextViewerWindow(
+									MessageText.getString( "vuzexcode.analysis.title" ),
+									null, "", true, true );
+
+					viewer.setNonProportionalFont();
+					
+					viewer.setEditable( false );
+
+					viewer.setOKEnabled( false );
+
+					boolean[] closed = { false };
+						
+					analysisContext2[]	current = { null };
+					
+					viewer.addListener(
+						new TextViewerWindow.TextViewerWindowListener(){
+							
+							@Override
+							public void closed(){
+							
+								synchronized( closed ){
+									
+									closed[0] = true;
+									
+									if ( current[0] != null ){
+										
+										current[0].cancel();
+									}
+								}
+							}
+						});
+					
+					new AEThread2( "MediaAnalyser" )
+					{
+						@Override
+						public void
+						run()
+						{
+							try{
+								TableRow[] rows = (TableRow[])target;
+								
+								for ( TableRow row: rows ){
+									
+									DiskManagerFileInfo file_info = (DiskManagerFileInfo)row.getDataSource();
+										
+									log( "Analysing " + file_info.getFile(true).getName() + "\r\n");
+									log( "----\r\n\r\n" );
+									
+									try{
+										analysisContext2 context = getMediaInfo( file_info );
+										
+										while( true ){
+											
+											try{
+												Thread.sleep( 250 );
+												
+											}catch( Throwable e ){
+											}
+											
+											synchronized( closed ){
+												
+												if ( closed[0] ){
+													
+													context.cancel();
+													
+													return;
+													
+												}else{
+													
+													current[0] = context;
+												}
+											}
+											
+											Map<String,Object> status = context.getStatus();
+											
+											long state = (Long)status.get( "state" );
+											
+											if ( state == 0 ){
+												
+											}else if ( state == 1 ){
+												
+												log( "Cancelled" );
+												
+												break;
+												
+											}else if ( state == 2 ){
+												
+												log( "Error: " + status.get( "error" ));
+												
+												break;
+												
+											}else{
+												
+												log((String)status.get( "result" ));
+												
+												break;
+											}
+										}
+									}catch( Throwable e ){
+										
+										e.printStackTrace();
+									}
+								}
+								
+							}finally{
+								
+								Utils.execSWTThread(
+									new Runnable()
+									{
+										public void
+										run()
+										{
+											if ( !viewer.isDisposed()){
+											
+												viewer.setOKEnabled( true );
+											}
+										}
+									});
+							}
+						}
+						
+						private void
+						log(
+							String	str )
+						{
+							Utils.execSWTThread(
+								new Runnable()
+								{
+									public void
+									run()
+									{
+										if ( !viewer.isDisposed()){
+											
+											viewer.append( str );
+										}
+									}
+								});
+						}
+					}.start();
+					
+					viewer.goModal();
+				}
+			});
 	}
 	
 	protected void buildTranscodeToMenu(TableContextMenuItem parent) {
@@ -478,7 +648,7 @@ TranscoderPlugin
 	{
 		synchronized( this ){
 			
-			if ( active_analysis.size() > 0 || active_transcode.size() > 0 ){
+			if ( active_analysis.size() > 0 || active_analysis2.size() > 0 || active_transcode.size() > 0 ){
 				
 				throw( new PluginException( "Unload prohibited, active transcodes" ));
 			}
@@ -512,6 +682,12 @@ TranscoderPlugin
 		
 			itemTranscodeMyTorrentsComplete.remove();
 			itemTranscodeMyTorrentsComplete = null;
+		}
+		
+		if ( itemMediaInfo != null ){
+			
+			itemMediaInfo.remove();
+			itemMediaInfo = null;
 		}
 		
 		if ( provider != null ){
@@ -596,7 +772,159 @@ TranscoderPlugin
 		provider.addProfilesChangedListener(runnable);
 	}
 	
+	private analysisContext2
+	getMediaInfo(
+		DiskManagerFileInfo		input )
+	
+		throws TranscodeException
+	{
+		try{
+
+			URL 				source_url		= null;
+			File				source_file	 	= null;
+
+			long	input_length = input.getLength();
+
+			if ( input_length > 0 && input_length == input.getDownloaded()){
+
+				File file = input.getFile();
+
+				if ( file.exists() && file.length() == input_length ){
+
+					source_file = file;
+				}
+			}
+
+			TranscodePipeStreamSource		pipe = null;
+
+			if ( source_file == null ){
+
+					// race condition here on auto-transcodes due to downloadadded listeners - can add the xcode to queue
+					// and schedule before added to upnpms - simple hack is to hang about a bit
+
+				for ( int i=0; i<10; i++ ){
+
+					PluginInterface av_pi = pluginInterface.getPluginManager().getPluginInterfaceByID( "azupnpav" );
+
+					if ( av_pi == null ){
+
+						throw( new TranscodeException( "Media Server plugin not found" ));
+					}
+
+					IPCInterface av_ipc = av_pi.getIPC();
+
+					String url_str = (String)av_ipc.invoke( "getContentURL", new Object[]{ input });
+
+					if ( url_str != null && url_str.length() > 0 ){
+
+						source_url = new URL( url_str );
+
+						pipe = new TranscodePipeStreamSource( source_url.getHost(), source_url.getPort());
+
+						source_url = UrlUtils.setHost( source_url, "127.0.0.1" );
+
+						source_url = UrlUtils.setPort( source_url, pipe.getPort2());
+					}
+
+					if ( source_url != null ){
+
+						break;
+
+					}else{
+
+						try{
+							Thread.sleep(1000);
+
+						}catch( Throwable e ){
+
+							break;
+						}
+					}
+				}
+			}
+
+			if ( source_file == null && source_url == null ){
+
+				throw( new TranscodeException( "File doesn't exist" ));
+			}
+
+			final TranscodePipeStreamSource f_pipe = pipe;
+
+			try{
+
+				final analysisContext2 analysis_context;
+
+				if ( source_url != null ){
+
+					analysis_context = new analysisContext2( source_url );
+					
+				}else{
+					
+					analysis_context = new analysisContext2( source_file );
+				}
+
+
+				new AEThread2( "analysisStatus", true )
+				{
+					@Override
+					public void
+					run()
+					{
+						try{
+							while( true ){
+
+								Map status = analysis_context.getStatus();
+
+								long	state = (Long)status.get( "state" );
+
+								if ( state == 0 ){
+
+										// running
+
+									try{
+										Thread.sleep( 250 );
+										
+									}catch( Throwable e ){
+										
+									}
+								}else{
+									
+									break;
+								}
+							}
+						}finally{
+
+							if ( f_pipe != null ){
+
+								f_pipe.destroy2();
+							}
+						}
+					}
+				}.start();
+
+				return( analysis_context );
+
+			}catch( Throwable e ){
+
+				if ( pipe != null ){
+
+					pipe.destroy2();
+				}
+
+				throw( e );
+			}
+		}catch( TranscodeException e ){
+
+			throw( e );
+
+		}catch( Throwable e ){
+
+			throw( new TranscodeException( "analysis failed", e ));
+		}
+	}
+		
 		// analysis
+		
 	
 	public Object
 	analyseContent(
@@ -1058,6 +1386,424 @@ TranscoderPlugin
 						synchronized( TranscoderPlugin.this ){
 							
 							active_analysis.remove( analysisContext.this );
+						}
+					}
+				}
+			}.start();
+		}
+		
+		protected void
+		cancel()
+		{
+			sem.reserve();
+				
+			log( "Analysis cancelled" );
+			
+			cancelled = true;
+			
+			if ( http_is != null ){
+				
+				try{
+					http_is.close();
+					
+				}catch( Throwable e ){
+					
+				}
+			}
+			
+			MediaAnalyser a = mediaAnalyser;
+			
+			if ( a != null ){
+				
+				a.cancel();
+			}
+		}
+				
+		public Map<String,Object>
+		getStatus()
+		{
+			Map<String,Object>	status = new HashMap<String,Object>();
+			
+			int	state = 0;
+			
+			if ( cancelled ){
+				
+				state = 1;
+				
+			}else if ( error != null ){
+				
+				state = 2;
+				
+			}else if ( done ){
+				
+				state = 3;
+			}
+			
+			status.put( "state", new Long( state ));
+			
+			if ( error != null ){
+				
+				status.put( "error", error );
+			}
+			
+			if ( done ){
+				
+				status.put( "result", result );
+			}
+						
+			return( status );
+		}
+	}
+	
+	protected class
+	analysisContext2
+	{
+		private URL						input_url;
+		private File					input_file;
+		
+
+		private File					temp_file;
+				
+		private AESemaphore sem = new AESemaphore( "Analysis2" );
+		
+		private MediaAnalyser 			mediaAnalyser;
+				
+		private volatile InputStream	http_is;
+		
+		private volatile boolean	done;
+		private volatile Throwable	error;
+		private volatile boolean	cancelled;
+		
+		String		result;
+		
+		protected
+		analysisContext2(
+			URL					_input_url )
+		{
+			input_url		= _input_url;
+			
+			String[]	file_name = input_url.getPath().split( "/" );
+			
+			temp_file = new File( temp_dir, file_name[file_name.length-1] );
+
+			initialise();
+		}
+		
+		protected
+		analysisContext2(
+			File				_input_file )
+		{
+			input_file		= _input_file;
+			
+			initialise();
+		}
+		
+		protected void
+		initialise()
+		{
+			new AEThread2( "Analysis", true )
+			{
+				public void
+				run()
+				{
+					try{
+						sem.releaseForever();
+
+						synchronized( TranscoderPlugin.this ){
+							
+							if ( plugin_closing || plugin_unloading ){
+								
+								error = new Throwable( "Plugin closing/unloading" );
+								
+								log( "Analysis failed", error );
+								
+								return;
+							}
+							
+							active_analysis2.add( analysisContext2.this );
+						}
+									
+						if ( cancelled ){
+							
+							return;
+						}
+												
+						int	http_timeout = http_timeout_mins.getValue() * 60* 1000;
+						
+						try{
+							String info = null;
+						
+							long	source_length = -1;
+							
+							if ( input_url != null ){
+																	
+								RandomAccessFile 	o_raf = null;
+								
+								final int INITIAL_START_OF_FILE_CHUNK 	= analysis_start_chunk.getValue()*1024;
+								final int INITIAL_END_OF_FILE_CHUNK 	= analysis_end_chunk.getValue()*1024;
+
+								int START_OF_FILE_CHUNK = INITIAL_START_OF_FILE_CHUNK;
+								int END_OF_FILE_CHUNK 	= INITIAL_END_OF_FILE_CHUNK;
+								
+								boolean done_whole_file = false;
+								
+								while( !cancelled ){
+									
+									log( "Downloading first " + DisplayFormatters.formatByteCountToKiBEtc( START_OF_FILE_CHUNK ) + " for analysis" );
+									
+									try{
+										AEProxySelectorFactory.getSelector().startNoProxy();
+										
+										if ( source_length == -1 ){
+											
+											HttpURLConnection connection = (HttpURLConnection)input_url.openConnection();
+										
+											connection.setReadTimeout( http_timeout );
+											
+											connection.setRequestMethod( "HEAD" );
+											
+											connection.connect();
+																			
+											long	length = -1;
+											
+											try{											
+												length = Long.parseLong( connection.getHeaderField( "content-length" ));
+											
+											}catch( Throwable e ){
+												
+												e.printStackTrace();
+											}
+											
+											source_length = length;
+										}
+										
+										HttpURLConnection connection = (HttpURLConnection)input_url.openConnection();
+		
+										connection.setReadTimeout( http_timeout );
+										
+										if ( source_length > 0 && source_length > START_OF_FILE_CHUNK ){
+											
+											connection.setRequestProperty( "range", "bytes=0-" + (START_OF_FILE_CHUNK-1));
+											
+										}else{
+											
+											if ( done_whole_file ){
+												
+												log( "Analysis failed, whole file scanned" );
+												
+												break;
+												
+											}else{
+												
+												done_whole_file = true;
+											}
+										}
+										
+										http_is = connection.getInputStream();
+		
+										o_raf = new RandomAccessFile( temp_file, "rw" );
+																	
+										byte[]	buffer = new byte[64*1024];
+										
+										long	total_written = 0;
+										
+										while( !cancelled ){
+											
+											int	len = http_is.read( buffer );
+											
+											if ( len <= 0 ){
+												
+												if ( source_length >= 0 && total_written == 0 ){
+													
+													throw( new FileNotFoundException());
+												}
+												
+												break;
+											}
+											
+											o_raf.write( buffer, 0, len );
+											
+											total_written += len;
+											
+											if ( total_written >= START_OF_FILE_CHUNK ){
+												
+												break;
+											}
+										}
+																	
+										o_raf.close();
+										
+										o_raf = null;
+										
+										if ( cancelled ){
+										
+											break;
+										}
+										
+										mediaAnalyser = new MediaAnalyser( TranscoderPlugin.this, mediaInfoPath );
+								
+										info = mediaAnalyser.getCompleteMediaInformation( temp_file.getAbsolutePath());
+									
+										mediaAnalyser = null;
+									
+										if ( info != null ){
+													
+											log( "Analysis of initial chunk succeeded" );
+											
+											break;
+										}
+
+										
+										if ( done_whole_file ){
+											
+											log( "Analysis failed, whole file scanned" );
+											
+											break;
+											
+										}else if (	source_length > START_OF_FILE_CHUNK &&
+													source_length - END_OF_FILE_CHUNK > 0 ){
+												
+											log( "Downloading last " + DisplayFormatters.formatByteCountToKiBEtc( END_OF_FILE_CHUNK ) + " for analysis" );
+	
+												// looks like it didn't work, grab end of file and retry
+											
+											o_raf = new RandomAccessFile( temp_file, "rw" );
+											
+												// check that we have enough space to allocate for the end
+											
+											o_raf.seek( source_length );
+											
+											o_raf.seek( source_length - END_OF_FILE_CHUNK );
+											
+											http_is.close();
+											
+											connection = (HttpURLConnection)input_url.openConnection();
+											
+											connection.setReadTimeout( http_timeout );
+											
+											connection.setRequestProperty( "range", "bytes=" + (source_length-END_OF_FILE_CHUNK) + "-" );
+											
+											http_is = connection.getInputStream();
+											
+											total_written = 0;
+											
+											while( !cancelled ){
+												
+												int	len = http_is.read( buffer );
+												
+												if ( len <= 0 ){
+													
+													break;
+												}
+												
+												o_raf.write( buffer, 0, len );
+												
+												total_written += len;
+												
+												if ( total_written >= END_OF_FILE_CHUNK ){
+													
+													break;
+												}
+											}
+																		
+											o_raf.close();
+											
+											o_raf = null;
+											
+											if ( cancelled ){
+												
+												break;
+											}
+											
+											mediaAnalyser = new MediaAnalyser( TranscoderPlugin.this, mediaInfoPath );
+												
+											info = mediaAnalyser.getCompleteMediaInformation( temp_file.getAbsolutePath());
+
+											mediaAnalyser = null;
+
+											if ( info != null ){
+													
+												log( "Analysis of final chunk succeeded" );
+												
+												break;	
+											}
+										}else{
+											
+											log( "Analysis failed, input exhausted" );
+											
+											break;
+										}
+							
+										if ( 	START_OF_FILE_CHUNK >= 16*1024*1024 &&
+												END_OF_FILE_CHUNK 	>= 16*1024*1024 ){
+											
+											log( "Analysis failed, limits exceeded" );
+											
+											break;
+										}
+
+										START_OF_FILE_CHUNK = START_OF_FILE_CHUNK*2;
+										END_OF_FILE_CHUNK	= END_OF_FILE_CHUNK*2;
+										
+									}finally{
+										
+										AEProxySelectorFactory.getSelector().endNoProxy();
+										
+										try{
+											if ( o_raf != null ){
+												
+												o_raf.close();
+											}
+										}catch( Throwable e ){
+										}
+										
+										try{
+											if ( http_is != null ){
+												
+												http_is.close();
+												
+												http_is = null;
+											}
+										}catch( Throwable e ){
+										}
+									}
+								}
+							}else{
+								
+								source_length = input_file.length();
+								
+								mediaAnalyser = new MediaAnalyser( TranscoderPlugin.this, mediaInfoPath );
+								
+								info = mediaAnalyser.getCompleteMediaInformation( input_file.getAbsolutePath());
+							
+								mediaAnalyser = null;
+							}
+							
+							if ( !cancelled && info != null ){
+								
+								result = info;
+							}
+							
+							log( "Analysis result: " + result );
+													
+							done	= true;
+							
+						}catch( Throwable e ){
+							
+							log( "Analysis failed", e );
+							
+							error = e;
+						}
+					}finally{
+							
+						if ( temp_file != null ){
+						
+							temp_file.delete();
+						}
+						
+						synchronized( TranscoderPlugin.this ){
+							
+							active_analysis2.remove( analysisContext2.this );
 						}
 					}
 				}

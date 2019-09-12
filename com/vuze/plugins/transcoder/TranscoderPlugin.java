@@ -302,6 +302,30 @@ TranscoderPlugin
 		itemMediaInfo = pluginInterface.getUIManager().getTableManager().addContextMenuItem(
 				TableManager.TABLE_TORRENT_FILES, "vuzexcode.menu.file.mediainfo");
 
+		itemMediaInfo.addFillListener(
+			new MenuItemFillListener(){
+				
+				@Override
+				public void menuWillBeShown(MenuItem menu, Object data){
+				
+					TableRow[] rows = (TableRow[])data;
+					
+					int	 num_ok = 0;
+					
+					for ( TableRow row: rows ){
+						
+						DiskManagerFileInfo file_info = (DiskManagerFileInfo)row.getDataSource();
+						
+						if ( file_info.getIndex() >= 0 ){
+							
+							num_ok++;
+						}
+					}
+					
+					menu.setEnabled( num_ok > 0 );
+				}
+			});
+		
 		itemMediaInfo.addMultiListener(
 			new MenuItemListener(){
 				
@@ -354,6 +378,11 @@ TranscoderPlugin
 									
 									DiskManagerFileInfo file_info = (DiskManagerFileInfo)row.getDataSource();
 										
+									if ( file_info.getIndex() < 0 ){
+										
+										continue;		// fake entry, e.g. from FilesView tree node
+									}
+									
 									log( "Analysing " + file_info.getFile(true).getName() + "\r\n");
 									log( "----\r\n\r\n" );
 									

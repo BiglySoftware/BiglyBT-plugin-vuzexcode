@@ -2,6 +2,8 @@ package com.vuze.transcoder;
 
 public abstract class AbstractTranscodeOperation implements TranscodeOperation {
 
+	public abstract void start();
+	
 	public int getETA() {
 		double framesPerSeconds = getFramesPerSecond();
 		if(framesPerSeconds > 0.0) {

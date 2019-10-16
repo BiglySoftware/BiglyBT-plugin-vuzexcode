@@ -366,7 +366,7 @@ public class InternalTranscodeOperation extends AbstractTranscodeOperation {
 			command.add("15");
 		}
 		
-		command.add(context.ffmpegPath);
+		command.add(context.ffmpegPaths[0]);
 		command.add("-y");
 		
 		command.add("-i");
@@ -558,7 +558,7 @@ public class InternalTranscodeOperation extends AbstractTranscodeOperation {
 					token = token.trim();
 					
 					if(token.endsWith(".ffpreset")) {
-						File presetFolder = new File((new File(context.ffmpegPath)).getParentFile(),"profiles");
+						File presetFolder = new File((new File(context.ffmpegPaths[0])).getParentFile(),"profiles");
 						File presetFile = new File(presetFolder,token);
 						token = presetFile.getAbsolutePath();
 						

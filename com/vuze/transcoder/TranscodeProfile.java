@@ -73,6 +73,8 @@ public class TranscodeProfile {
 	
 	String	device;
 	
+	boolean	v2Supported;
+	
 	public TranscodeProfile() {
 		
 	}
@@ -156,6 +158,9 @@ public class TranscodeProfile {
 					raw_options.add( value );
 				}
 			}
+			
+			v2Supported = getBooleanProperty( properties,"v2-supported", false );
+			
 		}catch( TranscodingException e ){
 			
 			throw( e );
@@ -314,6 +319,12 @@ public class TranscodeProfile {
 	isStreamable()
 	{
 		return( streamable );
+	}
+	
+	public boolean
+	isV2Supported()
+	{
+		return( v2Supported );
 	}
 	
 	public long getEstimatedTranscodeSize(int durationSecs) {

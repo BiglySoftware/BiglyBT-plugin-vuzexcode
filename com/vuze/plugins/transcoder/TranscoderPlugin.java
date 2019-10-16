@@ -64,7 +64,8 @@ TranscoderPlugin
 	
 	private int					threads;
 	
-	private String ffmpegPath;
+	private String ffmpegPathOld;
+	private String ffmpegPathNew;
 	private String mediaInfoPath;
 	
 	private File	temp_dir;
@@ -164,17 +165,20 @@ TranscoderPlugin
 		String plugin_dir = pluginInterface.getPluginDirectoryName();
 		
 		if(Constants.isWindows) {
-			ffmpegPath = new File(plugin_dir,"ffmpeg.exe").getAbsolutePath();
+			ffmpegPathOld = new File(plugin_dir,"ffmpeg.exe").getAbsolutePath();
+			ffmpegPathNew = new File(plugin_dir,"ffmpeg2.exe").getAbsolutePath();
 			mediaInfoPath = new File(plugin_dir,"mediainfo.exe").getAbsolutePath();
 		} else {
-			ffmpegPath = new File(plugin_dir,"ffmpeg").getAbsolutePath();
+			ffmpegPathOld = new File(plugin_dir,"ffmpeg").getAbsolutePath();
+			ffmpegPathNew = new File(plugin_dir,"ffmpeg2").getAbsolutePath();
 			mediaInfoPath = new File(plugin_dir,"mediainfo").getAbsolutePath();
 		}
 		
 		if(Constants.isOSX) {
 			//chmod on mediainfo and mplayer
 			chmod("+x",mediaInfoPath);
-			chmod("+x",ffmpegPath);
+			chmod("+x",ffmpegPathOld);
+			chmod("+x",ffmpegPathNew);
 		}
 		
 		temp_dir = new File( plugin_dir, "tmp" );
@@ -525,7 +529,7 @@ TranscoderPlugin
 					String saveTo = fd.open();
 					if (saveTo != null) {
 						TranscodeWindow window = new TranscodeWindow(fileName, saveTo,
-								profile, ffmpegPath, mediaInfoPath);
+								profile, new String[]{ ffmpegPathOld,ffmpegPathNew }, mediaInfoPath);
 					}
 				}
 			}
@@ -2129,7 +2133,7 @@ TranscoderPlugin
 						Boolean	force_b = (Boolean)analysis_result.get( "force_xcode" );
 						
 						try{
-							transcoder = new Transcoder( pluginInterface, ffmpegPath, input_str );
+							transcoder = new Transcoder( pluginInterface, new String[]{ ffmpegPathOld, ffmpegPathNew }, input_str );
 						
 							if ( !cancelled ){
 								

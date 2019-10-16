@@ -35,10 +35,10 @@ public class TranscodeWindow implements TranscodeListener {
 			String inputFileName,
 			String outputFileName,
 			TranscodeProfile profile,
-			String ffmpegPath,
+			String[] ffmpegPaths,
 			String mediainfoPath) 
 	{
-		this( null, inputFileName, outputFileName, profile, ffmpegPath,mediainfoPath );
+		this( null, inputFileName, outputFileName, profile, ffmpegPaths, mediainfoPath );
 	}
 	
 	public TranscodeWindow(
@@ -46,7 +46,7 @@ public class TranscodeWindow implements TranscodeListener {
 			final String inputFileName,
 			final String outputFileName,
 			final TranscodeProfile profile,
-			final String ffmpegPath,
+			final String[] ffmpegPaths,
 			final String mediainfoPath) {
 		
 		Shell mainShell = Utils.findAnyShell();
@@ -118,7 +118,7 @@ public class TranscodeWindow implements TranscodeListener {
 		AEThread2 go = new AEThread2("xcode launcher",true) {
 			public void run() {
 				try {
-					Transcoder transcoder = new Transcoder(plugin_interface,ffmpegPath,inputFileName);
+					Transcoder transcoder = new Transcoder(plugin_interface,ffmpegPaths,inputFileName);
 					
 					MediaAnalyser analyser = new MediaAnalyser(null,mediainfoPath);
 					

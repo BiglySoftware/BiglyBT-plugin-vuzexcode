@@ -9,7 +9,7 @@ import com.vuze.transcoder.media.VideoStream;
 
 public class TranscodeContext {
 	
-	String ffmpegPath;
+	String[] ffmpegPaths;
 	
 	private String originalInputFileName;
 	private String modifiedInputFileName;

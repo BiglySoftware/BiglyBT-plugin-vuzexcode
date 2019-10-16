@@ -18,7 +18,7 @@ public class Transcoder {
 	
 	TranscodeContext context;
 	
-	public Transcoder(PluginInterface plugin_interface, String ffmpegPath,String input ) throws TranscodingException {
+	public Transcoder(PluginInterface plugin_interface, String[] ffmpegPaths,String input ) throws TranscodingException {
 				
 		if ( Constants.isWindows && plugin_interface != null ){
 
@@ -29,14 +29,16 @@ public class Transcoder {
 		
 		context = new TranscodeContext();
 		
-		File f = new File(ffmpegPath);
-		
-		if(!f.exists()){
+		for ( String s: ffmpegPaths ){
+			File f = new File( s );
 			
-			throw new TranscodingException("FFmpeg not found at " + ffmpegPath); 
+			if(!f.exists()){
+				
+				throw new TranscodingException("FFmpeg not found at " + s); 
+			}
 		}
 		
-		context.ffmpegPath = ffmpegPath;
+		context.ffmpegPaths = ffmpegPaths;
 		
 		context.setOriginalInputFileName( input );
 
@@ -113,7 +115,17 @@ public class Transcoder {
 			}
 		}
 		
-		InternalTranscodeOperation operation = new InternalTranscodeOperation( context);
+		AbstractTranscodeOperation operation;
+		
+		if ( profile.isV2Supported()){
+			
+			operation = new InternalTranscodeOperation2( context);
+
+		}else{
+			
+			operation = new InternalTranscodeOperation( context);
+		}
+		
 		operation.start();
 		
 		return operation;

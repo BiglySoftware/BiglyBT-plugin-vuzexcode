@@ -1,7 +1,9 @@
 /.classpath
 /.project
 /ffmpeg
+/ffmpeg2
 /ffmpeg.exe
+/ffmpeg2.exe
 /mediainfo
 /mediainfo.exe
 /vzspath.exe

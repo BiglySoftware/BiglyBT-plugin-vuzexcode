@@ -1,15 +1,17 @@
 package com.vuze.transcoder.media;
 
+import java.util.Locale;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class StreamParser {
 	
-	final static Pattern durationPattern = Pattern.compile("(?:([0-9]*)h ?)?(?:([0-9]*)mn ?)?(?:([0-9]*)s)?");
-	final static Pattern bitratePattern = Pattern.compile("([0-9 \\.]*)(Kbps|Mbps)");
-	final static Pattern sizePattern = Pattern.compile("([0-9 \\.]*) (B|KiB|MiB|GiB)");
+	final static Pattern durationPattern = Pattern.compile("(?:([0-9]*)\\s*h ?)?(?:([0-9]*)\\s*(?:mn|min) ?)?(?:([0-9]*)\\s*s)?");
+	final static Pattern bitratePattern = Pattern.compile("([0-9 \\.]*)\\s*(Kbps|Mbps|kb/s|mb/s)", Pattern.CASE_INSENSITIVE );
+	final static Pattern sizePattern = Pattern.compile("([0-9 \\.]*) (B|KiB|MiB|GiB)", Pattern.CASE_INSENSITIVE );
 	final static Pattern intPattern = Pattern.compile("([0-9 ]*)");
 	final static Pattern floatPattern = Pattern.compile("([0-9 \\.]*)");
+	final static Pattern ratioPattern = Pattern.compile("([0-9 ]+)(?:/|:)([0-9 ]+)");
 	
 	String getKey(String line) {
 		int pos = line.indexOf(": ");
@@ -82,8 +84,8 @@ public class StreamParser {
 					return 0;
 				}
 			}
-			String unit = matcher.group(2);
-			if(unit != null && unit.equals("Mbps")) {
+			String unit = matcher.group(2).toLowerCase(Locale.US);
+			if(unit != null && unit.startsWith( "m")) {
 				result *= 1000;
 			}
 			return (int)result;
@@ -106,14 +108,14 @@ public class StreamParser {
 					return 0;
 				}
 			}
-			String unit = matcher.group(2);
-			if(unit != null && unit.equals("KiB")) {
+			String unit = matcher.group(2).toLowerCase(Locale.US);
+			if(unit != null && unit.equals("kib")) {
 				result *= 1024;
 			}
-			if(unit != null && unit.equals("MiB")) {
+			if(unit != null && unit.equals("mib")) {
 				result *= 1024 * 1024;
 			}
-			if(unit != null && unit.equals("GiB")) {
+			if(unit != null && unit.equals("gib")) {
 				result *= 1024 * 1024 * 1024;
 			}
 			return (long)result;
@@ -140,6 +142,23 @@ public class StreamParser {
 			return result;
 		}
 		return 0;
+	}
+	
+	double getRatio(String line) {
+		String value = getStringValue(line);
+		Matcher matcher = ratioPattern.matcher(value);
+		if(matcher.find()) {
+			try{
+				double i1 = Integer.parseInt( matcher.group(1).trim());
+				double i2 = Integer.parseInt( matcher.group(2).trim());
+				
+				return( i1/i2 );
+			} catch (Throwable t) {
+				
+			}
+		}
+
+		return( getDoubleValue( line ));
 	}
 	
 	double getDoubleValue(String line) {

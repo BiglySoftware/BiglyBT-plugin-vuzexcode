@@ -2,6 +2,8 @@ package com.vuze.transcoder.media;
 
 public class MediaStream extends StreamParser {
 	
+	final boolean	isVideo;
+	
 	String id;
 	
 	String format;
@@ -18,8 +20,13 @@ public class MediaStream extends StreamParser {
 	
 	String language;
 	
-	public MediaStream() {
-		
+	
+	String tempFormat;
+	
+	public MediaStream(
+		boolean	v ) 
+	{
+		isVideo = v;
 	}
 	
 	public int
@@ -35,6 +42,20 @@ public class MediaStream extends StreamParser {
 				
 				format = getStringValue(line);
 				
+				if ( !isVideo && format != null ){
+					
+					int pos = format.lastIndexOf( " " );
+					
+					if ( pos > 0 ){
+						
+							// new version has AAC LC as format and no format-profile
+						
+						tempFormat = format;
+						
+						profile = format.substring( pos ).trim();
+						format	= format.substring( 0, pos ).trim();
+					}
+				}
 			} else if(key.equals("Duration")) {
 				
 				duration = getDurationValue(line);
@@ -76,6 +97,10 @@ public class MediaStream extends StreamParser {
 				
 				profile = getStringValue(line);
 					
+				if ( profile != null && tempFormat != null ){
+					
+					format = tempFormat;
+				}
 			} else if(key.equals("Language")) {
 				
 				language = getStringValue(line);

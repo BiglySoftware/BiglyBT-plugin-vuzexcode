@@ -13,6 +13,12 @@ public class VideoStream extends MediaStream {
 	
 	double displayAspectRatio;
 	
+	public
+	VideoStream()
+	{
+		super( true );
+	}
+	
 	public String toString() {
 		StringBuffer sb = new StringBuffer(super.toString());
 		sb.append("\nColorspace : ");
@@ -52,13 +58,13 @@ public class VideoStream extends MediaStream {
 		super.parseLine(line);
 		String key = getKey(line);
 		if(key != null) {
-			if(key.equals("Colorimetry")) {
+			if(key.equals("Colorimetry") || key.equals("Chroma subsampling")) {
 				
 				colorSpace = getStringValue(line);
 				
 			} else if(key.equals("Display aspect ratio")) {
 				
-				displayAspectRatio = getDoubleValue(line);
+				displayAspectRatio = getRatio(line);
 					
 			} else if(key.equals("Width")) {
 				

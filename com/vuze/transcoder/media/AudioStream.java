@@ -14,7 +14,7 @@ public class AudioStream extends MediaStream {
 	String title;
 
 	public AudioStream() {
-		super();
+		super( false );
 	}
 
 	public String toString() {

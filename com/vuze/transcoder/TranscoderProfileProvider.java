@@ -20,14 +20,16 @@ public class TranscoderProfileProvider {
 	List<Runnable> listProfilesChangedListeners = new ArrayList<Runnable>(1);
 
 	private final TranscoderPlugin plugin;
+	private boolean	use_v2;
 	
 	private TranscoderProfileCloner 	cloner;
 
 	private TranscodeProfile[] baseProfiles;
 	
-	public TranscoderProfileProvider(TranscoderPlugin plugin, PluginInterface pi) {
+	public TranscoderProfileProvider(TranscoderPlugin plugin, PluginInterface pi, boolean use_v2) {
 		
 		this.plugin = plugin;
+		this.use_v2 = use_v2;
 		
 		plugin_interface = pi;
 		
@@ -120,7 +122,7 @@ public class TranscoderProfileProvider {
 		try{
 			fis = new FileInputStream(file);
 			
-			TranscodeProfile profile = new TranscodeProfile( fis );
+			TranscodeProfile profile = new TranscodeProfile( fis, use_v2 );
 			
 			return( profile );
 			

@@ -152,7 +152,52 @@ TranscoderPlugin
 		
 		final LocaleUtilities loc_utils = pluginInterface.getUtilities().getLocaleUtilities();
 
-		provider = new TranscoderProfileProvider(this, pluginInterface);
+		UIManager	ui_manager = pluginInterface.getUIManager();
+
+		config_model = ui_manager.createBasicPluginConfigModel( "vuzexcode.name" );
+		
+		BooleanParameter enable_menus = config_model.addBooleanParameter2( "vuzexcode.enable_menus", "vuzexcode.enable_menus", false );
+		
+		analysis_start_chunk 	= config_model.addIntParameter2( "vuzexcode.analysis_start", "vuzexcode.analysis_start", 128, 32, Integer.MAX_VALUE );
+		analysis_end_chunk 		= config_model.addIntParameter2( "vuzexcode.analysis_end", "vuzexcode.analysis_end", 128, 32, Integer.MAX_VALUE );
+
+		int procs = Runtime.getRuntime().availableProcessors();
+		
+		if ( procs > 1 ){
+			
+			String[]	 values = new String[procs];
+			
+			for ( int i=0;i<procs;i++ ){
+				
+				values[i] = String.valueOf(i+1);
+			}
+			
+			final StringListParameter thread_param = config_model.addStringListParameter2( "vuzexcode.threads", "vuzexcode.threads", values, String.valueOf( procs ));
+			
+			thread_param.addListener(
+				new ParameterListener()
+				{
+					public void 
+					parameterChanged(
+						Parameter param  )
+					{
+						setThreads( thread_param.getValue());
+					}
+				});
+			
+			setThreads( thread_param.getValue());
+			
+		}else{
+			
+			threads = 1;
+		}
+		
+		http_timeout_mins 		= config_model.addIntParameter2( "vuzexcode.analysis_timeout", "vuzexcode.analysis_timeout", 3, 1, Integer.MAX_VALUE );
+
+		
+		BooleanParameter legacy_xcoder= config_model.addBooleanParameter2( "vuzexcode.legacy_xcoder", "vuzexcode.legacy_xcoder", false );
+
+		provider = new TranscoderProfileProvider(this, pluginInterface, !legacy_xcoder.getValue());
 		
 		try{
 		
@@ -194,9 +239,7 @@ TranscoderPlugin
 				f.delete();
 			}
 		}
-		
-		UIManager	ui_manager = pluginInterface.getUIManager();
-		
+				
 		view_model = ui_manager.createBasicPluginViewModel( loc_utils.getLocalisedMessageText("vuzexcode.name") );
 		
 		view_model.getActivity().setVisible( false );
@@ -236,45 +279,6 @@ TranscoderPlugin
 	
 		view_model.setConfigSectionID( "vuzexcode.name" );
 				
-		config_model = ui_manager.createBasicPluginConfigModel( "vuzexcode.name" );
-				
-		BooleanParameter enable_menus = config_model.addBooleanParameter2( "vuzexcode.enable_menus", "vuzexcode.enable_menus", false );
-		
-		analysis_start_chunk 	= config_model.addIntParameter2( "vuzexcode.analysis_start", "vuzexcode.analysis_start", 128, 32, Integer.MAX_VALUE );
-		analysis_end_chunk 		= config_model.addIntParameter2( "vuzexcode.analysis_end", "vuzexcode.analysis_end", 128, 32, Integer.MAX_VALUE );
-
-		int procs = Runtime.getRuntime().availableProcessors();
-		
-		if ( procs > 1 ){
-			
-			String[]	 values = new String[procs];
-			
-			for ( int i=0;i<procs;i++ ){
-				
-				values[i] = String.valueOf(i+1);
-			}
-			
-			final StringListParameter thread_param = config_model.addStringListParameter2( "vuzexcode.threads", "vuzexcode.threads", values, String.valueOf( procs ));
-			
-			thread_param.addListener(
-				new ParameterListener()
-				{
-					public void 
-					parameterChanged(
-						Parameter param  )
-					{
-						setThreads( thread_param.getValue());
-					}
-				});
-			
-			setThreads( thread_param.getValue());
-			
-		}else{
-			
-			threads = 1;
-		}
-		
-		http_timeout_mins 		= config_model.addIntParameter2( "vuzexcode.analysis_timeout", "vuzexcode.analysis_timeout", 3, 1, Integer.MAX_VALUE );
 
 		
 		if ( enable_menus.getValue()){

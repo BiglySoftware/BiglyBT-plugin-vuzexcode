@@ -336,6 +336,11 @@ public class InternalTranscodeOperation extends AbstractTranscodeOperation {
 				unParsedOutput.append(line);
 				unParsedOutput.append("\n");
 
+				if ( Constants.isCVSVersion()){
+					
+					context.log( line );
+				}
+				
 				rem -= (line.length() + 1 );
 				
 				if ( rem <= 0 ){

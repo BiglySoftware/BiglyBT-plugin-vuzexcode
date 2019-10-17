@@ -1,16 +1,21 @@
 package com.vuze.transcoder;
 
+import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.LineNumberReader;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Properties;
 import java.util.StringTokenizer;
 import java.util.TreeMap;
 
+import com.biglybt.core.util.Constants;
 import com.biglybt.core.util.StringInterner;
 
 import com.vuze.plugins.transcoder.TranscoderPlugin;
@@ -74,12 +79,57 @@ public class TranscodeProfile {
 	String	device;
 	
 	boolean	v2Supported;
-	
-	public TranscodeProfile() {
 		
-	}
+	public 
+	TranscodeProfile( 
+		InputStream profileDef,
+		boolean		v2_enabled )
 	
-	public TranscodeProfile( InputStream profileDef) throws TranscodingException {
+		throws TranscodingException 
+	{
+		if ( !v2_enabled ){
+			
+			LineNumberReader lnr = new LineNumberReader( new InputStreamReader( profileDef, Constants.UTF_8 ));		
+			
+			StringBuilder truncated = new StringBuilder();
+			
+			try{
+				while( true ){
+				
+					String line = lnr.readLine();
+					
+					if ( line == null ){
+						
+						break;
+					}
+					
+					String lc = line.toLowerCase( Locale.US ).trim();
+					
+					if ( lc.contains( "v2-supported=true" ) && !lc.startsWith( "#" )){
+						
+						break;
+					}
+					
+					truncated.append( line );
+					truncated.append( "\r\n"  );
+				}
+			}catch( Throwable e ){
+				
+				throw( new TranscodingException( e ));
+				
+			}finally{
+				
+				try{
+					lnr.close();
+					
+				}catch( Throwable e ){
+					
+				}
+			}
+			
+			profileDef = new ByteArrayInputStream( truncated.toString().getBytes( Constants.UTF_8 ));
+		}
+		
 		Properties properties = new Properties();
 		try {
 			properties.load(profileDef);

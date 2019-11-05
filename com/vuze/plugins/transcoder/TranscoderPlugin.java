@@ -197,7 +197,10 @@ TranscoderPlugin
 		
 		BooleanParameter legacy_xcoder= config_model.addBooleanParameter2( "vuzexcode.legacy_xcoder", "vuzexcode.legacy_xcoder", false );
 
-		provider = new TranscoderProfileProvider(this, pluginInterface, !legacy_xcoder.getValue());
+		boolean v1_supported = Constants.isOSX || Constants.isWindows;
+		boolean v2_supported = !legacy_xcoder.getValue();
+	
+		provider = new TranscoderProfileProvider(this, pluginInterface, v1_supported, v2_supported );
 		
 		try{
 		
@@ -209,20 +212,29 @@ TranscoderPlugin
 		
 		String plugin_dir = pluginInterface.getPluginDirectoryName();
 		
-		if(Constants.isWindows) {
+		if ( Constants.isWindows ){
+			
 			ffmpegPathOld = new File(plugin_dir,"ffmpeg.exe").getAbsolutePath();
 			ffmpegPathNew = new File(plugin_dir,"ffmpeg2.exe").getAbsolutePath();
 			mediaInfoPath = new File(plugin_dir,"mediainfo.exe").getAbsolutePath();
-		} else {
+			
+		}else if( Constants.isOSX ){
+			
 			ffmpegPathOld = new File(plugin_dir,"ffmpeg").getAbsolutePath();
 			ffmpegPathNew = new File(plugin_dir,"ffmpeg2").getAbsolutePath();
 			mediaInfoPath = new File(plugin_dir,"mediainfo").getAbsolutePath();
-		}
-		
-		if(Constants.isOSX) {
-			//chmod on mediainfo and mplayer
+			
 			chmod("+x",mediaInfoPath);
 			chmod("+x",ffmpegPathOld);
+			chmod("+x",ffmpegPathNew);
+
+		}else{
+			
+			ffmpegPathOld = "";	// no old one supported
+			ffmpegPathNew = new File(plugin_dir,"ffmpeg2").getAbsolutePath();
+			mediaInfoPath = new File(plugin_dir,"mediainfo").getAbsolutePath();
+			
+			chmod("+x",mediaInfoPath);
 			chmod("+x",ffmpegPathNew);
 		}
 		

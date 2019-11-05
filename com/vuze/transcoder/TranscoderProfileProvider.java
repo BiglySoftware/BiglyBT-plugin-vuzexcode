@@ -20,16 +20,18 @@ public class TranscoderProfileProvider {
 	List<Runnable> listProfilesChangedListeners = new ArrayList<Runnable>(1);
 
 	private final TranscoderPlugin plugin;
-	private boolean	use_v2;
+	private boolean v1_supported;
+	private boolean	v2_supported;
 	
 	private TranscoderProfileCloner 	cloner;
 
 	private TranscodeProfile[] baseProfiles;
 	
-	public TranscoderProfileProvider(TranscoderPlugin plugin, PluginInterface pi, boolean use_v2) {
+	public TranscoderProfileProvider(TranscoderPlugin plugin, PluginInterface pi, boolean v1_supported, boolean v2_supported) {
 		
 		this.plugin = plugin;
-		this.use_v2 = use_v2;
+		this.v1_supported = v1_supported;
+		this.v2_supported = v2_supported;
 		
 		plugin_interface = pi;
 		
@@ -122,8 +124,12 @@ public class TranscoderProfileProvider {
 		try{
 			fis = new FileInputStream(file);
 			
-			TranscodeProfile profile = new TranscodeProfile( fis, use_v2 );
+			TranscodeProfile profile = new TranscodeProfile( fis, v2_supported );
 			
+			if ( !v1_supported && !profile.isV2Supported()){
+				
+				return( null );
+			}
 			return( profile );
 			
 		}catch( Throwable e ){

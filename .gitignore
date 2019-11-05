@@ -1,5 +1,6 @@
 /.classpath
 /.project
+/dist
 /ffmpeg
 /ffmpeg2
 /ffmpeg.exe
@@ -11,4 +12,5 @@
 *.class
 *.zip
 *.biglybt
-
+/libmediainfo.so
+/libzen.so

@@ -30,11 +30,17 @@ public class Transcoder {
 		context = new TranscodeContext();
 		
 		for ( String s: ffmpegPaths ){
+			
+			if ( s == null || s.isEmpty()){
+				
+				continue;
+			}
+			
 			File f = new File( s );
 			
-			if(!f.exists()){
+			if (!f.exists()){
 				
-				throw new TranscodingException("FFmpeg not found at " + s); 
+				throw new TranscodingException( "ffmpeg not found at " + s); 
 			}
 		}
 		

@@ -33,7 +33,6 @@ import com.biglybt.core.devices.DeviceManager;
 import com.biglybt.core.devices.DeviceManagerFactory;
 import com.biglybt.core.devices.TranscodeException;
 
-import com.biglybt.core.download.DiskManagerFileInfoURL;
 import com.biglybt.core.internat.MessageText;
 import com.biglybt.core.proxy.AEProxySelectorFactory;
 import com.biglybt.core.util.average.Average;
@@ -56,7 +55,8 @@ TranscoderPlugin
 	private TableContextMenuItem itemTranscodeFiles;
 	private TableContextMenuItem itemTranscodeMyTorrentsBig;
 	private TableContextMenuItem itemTranscodeMyTorrentsComplete;
-	private TableContextMenuItem itemMediaInfo;
+	
+	private List<TableContextMenuItem> itemMediaInfos = new ArrayList<>();
 
 	private IntParameter		analysis_start_chunk;
 	private IntParameter		analysis_end_chunk;
@@ -319,9 +319,11 @@ TranscoderPlugin
 			}
 		}
 	
-		itemMediaInfo = pluginInterface.getUIManager().getTableManager().addContextMenuItem(
+		TableContextMenuItem itemMediaInfo = pluginInterface.getUIManager().getTableManager().addContextMenuItem(
 				TableManager.TABLE_TORRENT_FILES, "vuzexcode.menu.file.mediainfo");
 
+		itemMediaInfos.add( itemMediaInfo );
+		
 		itemMediaInfo.addFillListener(
 			new MenuItemFillListener(){
 				
@@ -352,155 +354,223 @@ TranscoderPlugin
 				@Override
 				public void selected(MenuItem menu, Object target){
 					
-					TextViewerWindow viewer =
-							new TextViewerWindow(
-									MessageText.getString( "vuzexcode.analysis.title" ),
-									null, "", true, true );
+					runMediaAnalyser( target );
+				}
+			});
+		
+		for ( String tid: TableManager.TABLE_MYTORRENTS_ALL ){
+			
+			TableContextMenuItem itemMediaInfo2 = 
+					pluginInterface.getUIManager().getTableManager().addContextMenuItem(
+							tid, "vuzexcode.menu.file.mediainfo");
 
-					viewer.setNonProportionalFont();
-					
-					viewer.setEditable( false );
-
-					viewer.setOKEnabled( false );
-
-					boolean[] closed = { false };
+			itemMediaInfos.add( itemMediaInfo2 );
+			
+			itemMediaInfo2.setHeaderCategory(MenuItem.HEADER_CONTENT);
+			
+			itemMediaInfo2.addFillListener(
+					new MenuItemFillListener(){
 						
-					analysisContext2[]	current = { null };
+						@Override
+						public void menuWillBeShown(MenuItem menu, Object data){
+						
+							TableRow[] rows = (TableRow[])data;
+							
+							int	 num_ok = 0;
+							
+							for ( TableRow row: rows ){
+								
+								Download dl = (Download)row.getDataSource();
+								
+								if ( dl.getPrimaryFile() != null ){
+									
+									num_ok++;
+								}
+							}
+							
+							menu.setEnabled( num_ok > 0 );
+						}
+					});
+			
+			itemMediaInfo2.addMultiListener(
+					new MenuItemListener(){
+						
+						@Override
+						public void selected(MenuItem menu, Object target){
+							
+							runMediaAnalyser( target );
+						}
+					});
+				
+		}
+	}
+	
+	private void
+	runMediaAnalyser(
+		Object		target )
+	{
+		TextViewerWindow viewer =
+				new TextViewerWindow(
+						MessageText.getString( "vuzexcode.analysis.title" ),
+						null, "", true, true );
+
+		viewer.setNonProportionalFont();
+		
+		viewer.setEditable( false );
+
+		viewer.setOKEnabled( false );
+
+		boolean[] closed = { false };
+			
+		analysisContext2[]	current = { null };
+		
+		viewer.addListener(
+			new TextViewerWindow.TextViewerWindowListener(){
+				
+				@Override
+				public void closed(){
+				
+					synchronized( closed ){
+						
+						closed[0] = true;
+						
+						if ( current[0] != null ){
+							
+							current[0].cancel();
+						}
+					}
+				}
+			});
+		
+		new AEThread2( "MediaAnalyser" )
+		{
+			@Override
+			public void
+			run()
+			{
+				try{
+					TableRow[] rows = (TableRow[])target;
 					
-					viewer.addListener(
-						new TextViewerWindow.TextViewerWindowListener(){
+					for ( TableRow row: rows ){
+						
+						Object	ds = row.getDataSource();
+						
+						DiskManagerFileInfo file_info;
+						
+						if ( ds instanceof Download ){
 							
-							@Override
-							public void closed(){
+							file_info = ((Download)ds).getPrimaryFile();
 							
+							if ( file_info == null ){
+								
+								continue;
+							}
+						}else{
+						
+							file_info = (DiskManagerFileInfo)ds;
+							
+							if ( file_info.getIndex() < 0 ){
+							
+								continue;		// fake entry, e.g. from FilesView tree node
+							}
+						}
+						
+						log( "Analysing " + file_info.getFile(true).getName() + "\r\n");
+						log( "----\r\n\r\n" );
+						
+						try{
+							analysisContext2 context = getMediaInfo( file_info );
+							
+							while( true ){
+								
+								try{
+									Thread.sleep( 250 );
+									
+								}catch( Throwable e ){
+								}
+								
 								synchronized( closed ){
 									
-									closed[0] = true;
-									
-									if ( current[0] != null ){
+									if ( closed[0] ){
 										
-										current[0].cancel();
+										context.cancel();
+										
+										return;
+										
+									}else{
+										
+										current[0] = context;
 									}
+								}
+								
+								Map<String,Object> status = context.getStatus();
+								
+								long state = (Long)status.get( "state" );
+								
+								if ( state == 0 ){
+									
+								}else if ( state == 1 ){
+									
+									log( "Cancelled" );
+									
+									break;
+									
+								}else if ( state == 2 ){
+									
+									log( "Error: " + status.get( "error" ));
+									
+									break;
+									
+								}else{
+									
+									log((String)status.get( "result" ));
+									
+									break;
+								}
+							}
+						}catch( Throwable e ){
+							
+							e.printStackTrace();
+						}
+					}
+					
+				}finally{
+					
+					Utils.execSWTThread(
+						new Runnable()
+						{
+							public void
+							run()
+							{
+								if ( !viewer.isDisposed()){
+								
+									viewer.setOKEnabled( true );
 								}
 							}
 						});
-					
-					new AEThread2( "MediaAnalyser" )
+				}
+			}
+			
+			private void
+			log(
+				String	str )
+			{
+				Utils.execSWTThread(
+					new Runnable()
 					{
-						@Override
 						public void
 						run()
 						{
-							try{
-								TableRow[] rows = (TableRow[])target;
+							if ( !viewer.isDisposed()){
 								
-								for ( TableRow row: rows ){
-									
-									DiskManagerFileInfo file_info = (DiskManagerFileInfo)row.getDataSource();
-										
-									if ( file_info.getIndex() < 0 ){
-										
-										continue;		// fake entry, e.g. from FilesView tree node
-									}
-									
-									log( "Analysing " + file_info.getFile(true).getName() + "\r\n");
-									log( "----\r\n\r\n" );
-									
-									try{
-										analysisContext2 context = getMediaInfo( file_info );
-										
-										while( true ){
-											
-											try{
-												Thread.sleep( 250 );
-												
-											}catch( Throwable e ){
-											}
-											
-											synchronized( closed ){
-												
-												if ( closed[0] ){
-													
-													context.cancel();
-													
-													return;
-													
-												}else{
-													
-													current[0] = context;
-												}
-											}
-											
-											Map<String,Object> status = context.getStatus();
-											
-											long state = (Long)status.get( "state" );
-											
-											if ( state == 0 ){
-												
-											}else if ( state == 1 ){
-												
-												log( "Cancelled" );
-												
-												break;
-												
-											}else if ( state == 2 ){
-												
-												log( "Error: " + status.get( "error" ));
-												
-												break;
-												
-											}else{
-												
-												log((String)status.get( "result" ));
-												
-												break;
-											}
-										}
-									}catch( Throwable e ){
-										
-										e.printStackTrace();
-									}
-								}
-								
-							}finally{
-								
-								Utils.execSWTThread(
-									new Runnable()
-									{
-										public void
-										run()
-										{
-											if ( !viewer.isDisposed()){
-											
-												viewer.setOKEnabled( true );
-											}
-										}
-									});
+								viewer.append( str );
 							}
 						}
-						
-						private void
-						log(
-							String	str )
-						{
-							Utils.execSWTThread(
-								new Runnable()
-								{
-									public void
-									run()
-									{
-										if ( !viewer.isDisposed()){
-											
-											viewer.append( str );
-										}
-									}
-								});
-						}
-					}.start();
-					
-					viewer.goModal();
-				}
-			});
+					});
+			}
+		}.start();
+		
+		viewer.goModal();
 	}
 	
 	protected void buildTranscodeToMenu(TableContextMenuItem parent) {
@@ -733,11 +803,12 @@ TranscoderPlugin
 			itemTranscodeMyTorrentsComplete = null;
 		}
 		
-		if ( itemMediaInfo != null ){
+		for ( TableContextMenuItem cmi: itemMediaInfos ){
 			
-			itemMediaInfo.remove();
-			itemMediaInfo = null;
+			cmi.remove();
 		}
+		
+		itemMediaInfos.clear();
 		
 		if ( provider != null ){
 			

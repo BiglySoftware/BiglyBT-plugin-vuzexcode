@@ -409,10 +409,12 @@ TranscoderPlugin
 	runMediaAnalyser(
 		Object		target )
 	{
+			// removed modality - seems to work fine :)
+		
 		TextViewerWindow viewer =
 				new TextViewerWindow(
 						MessageText.getString( "vuzexcode.analysis.title" ),
-						null, "", true, true );
+						null, "", false, false );
 
 		viewer.setNonProportionalFont();
 		
@@ -545,6 +547,8 @@ TranscoderPlugin
 								if ( !viewer.isDisposed()){
 								
 									viewer.setOKEnabled( true );
+									
+									viewer.setCancelEnabled( false );
 								}
 							}
 						});
@@ -570,7 +574,7 @@ TranscoderPlugin
 			}
 		}.start();
 		
-		viewer.goModal();
+		//viewer.goModal();
 	}
 	
 	protected void buildTranscodeToMenu(TableContextMenuItem parent) {

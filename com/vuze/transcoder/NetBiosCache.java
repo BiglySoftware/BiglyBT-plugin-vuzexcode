@@ -18,8 +18,10 @@
  
 package com.vuze.transcoder;
 
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
+
+import com.biglybt.core.util.AESemaphore;
+import com.biglybt.core.util.AsyncDispatcher;
 
 import jcifs.netbios.NbtAddress;
 
@@ -32,28 +34,73 @@ public class NetBiosCache
 {
 	static private Map<String, String> mapIpToName = new HashMap<String, String>();
 	
-	public static String getNetBiosName(String ip) {
-		synchronized (mapIpToName) {
+	static private AsyncDispatcher 	dispatcher = new AsyncDispatcher( "NetBiosCache" );
+	
+	public static String 
+	getNetBiosName(
+		String ip) 
+	{
+		AESemaphore sem = new AESemaphore("NetBiosCache");
+
+		synchronized( mapIpToName ){
+			
 			String name = mapIpToName.get(ip);
-			if (name != null) {
-				return name;
+			
+			if ( name != null ){
+				
+				return( name );
 			}
 			
-			try {
-  			NbtAddress[] allByAddress = NbtAddress.getAllByAddress(ip);
-  			if (allByAddress != null && allByAddress.length > 0) {
-  				// could check for code 00
-  				name = allByAddress[0].getHostName();
-  			}
-			} catch (Throwable t) {
-				// ignore
+			if ( dispatcher.getQueueSize() > 32 ){
+				
+				return( "" );
 			}
+						
+			dispatcher.dispatch(()->{
+				String result = "";
+				
+				try{
+						// seen this hang up, hence the async code
+					
+					NbtAddress[] allByAddress = NbtAddress.getAllByAddress(ip);
+					
+					if ( allByAddress != null && allByAddress.length > 0 ){
+						
+							// could check for code 00
+						
+						result = allByAddress[0].getHostName();
+						
+						if ( result == null ){
+							
+							result = "";
+						}
+					}
+				}catch( Throwable t ){
+				
+				}finally{
+					
+					synchronized( mapIpToName ){
+						
+						mapIpToName.put( ip, result );
+					}
+					
+					sem.release();
+				}
+			});
+		}
+		
+		sem.reserve( 20*1000 );
 
-			if (name == null) {
+		synchronized( mapIpToName ){
+			
+			String name = mapIpToName.get(ip);
+			
+			if ( name == null ){
+				
 				name = "";
 			}
-			mapIpToName.put(ip, name);
-			return name;
+			
+			return( name );
 		}
 	}
 }

@@ -8,9 +8,9 @@
 /mediainfo
 /mediainfo.exe
 /vzspath.exe
-*.jar
 *.class
 *.zip
 *.biglybt
 /libmediainfo.so
 /libzen.so
+/vuzexcode_*.jar

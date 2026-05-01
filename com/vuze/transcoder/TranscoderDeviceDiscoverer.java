@@ -46,7 +46,8 @@ TranscoderDeviceDiscoverer
 	private TranscoderPlugin				plugin;
 	private DeviceManagerDiscoveryListener	dm_discovery_listener;
 	
-	private Set<String>		logged_addresses = new HashSet<String>();
+	private Set<String>		logged_addresses = new HashSet<>();
+	private Set<String>		ps4_detect_fails = new HashSet<>();
 	
 	
 	public
@@ -226,31 +227,40 @@ TranscoderDeviceDiscoverer
 										// PS4 has no identifying features :(
 										// However it should have TCP port 9295 open to support 'remote play' so see if we can detect this
 									
+									URL url = null;
+									
 									try{
 										String host = client_address.getAddress().getHostAddress();
 										
-										URL url = new URL( "http://" + host + ":9295" );
+										url = new URL( "http://" + host + ":9295" );
 										
-										HttpURLConnection conn = (HttpURLConnection)url.openConnection();
-
-										conn.setRequestMethod("HEAD");
-
-										UrlUtils.setBrowserHeaders( conn, null );
-
-										UrlUtils.connectWithTimeouts(conn, 1500, 5000);
-
-										String remote_play_version = conn.getHeaderField("RP-Version");
-
-										if ( remote_play_version != null ){
-											
-												// image id "1" is for the ps3 which works
-											
-											handleGeneric(deviceManager, client_address, "sony.ps4", "PS4", "1", true );
-											
-											return true;
-										}								
+										if ( !ps4_detect_fails.contains( url.toExternalForm())){
+																				
+											HttpURLConnection conn = (HttpURLConnection)url.openConnection();
+	
+											conn.setRequestMethod("HEAD");
+	
+											UrlUtils.setBrowserHeaders( conn, null );
+	
+											UrlUtils.connectWithTimeouts(conn, 1500, 5000);
+	
+											String remote_play_version = conn.getHeaderField("RP-Version");
+	
+											if ( remote_play_version != null ){
+												
+													// image id "1" is for the ps3 which works
+												
+												handleGeneric(deviceManager, client_address, "sony.ps4", "PS4", "1", true );
+												
+												return true;
+											}	
+										}
 									}catch( Throwable e ){
-										e.printStackTrace();
+										
+										if ( url != null ){
+											
+											ps4_detect_fails.add( url.toExternalForm());
+										}
 									}
 									
 									String hostName = NetBiosCache.getNetBiosName(client_address.getAddress().getHostAddress());

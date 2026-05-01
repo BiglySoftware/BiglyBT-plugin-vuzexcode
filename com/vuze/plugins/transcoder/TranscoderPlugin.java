@@ -546,6 +546,15 @@ TranscoderPlugin
 							{
 								if ( !viewer.isDisposed()){
 								
+									try{
+											// scroll to top - requires 4001_B33+
+										
+										viewer.setSelection( 0, 0 );
+										
+									}catch( Throwable e ){
+										
+									}
+									
 									viewer.setOKEnabled( true );
 									
 									viewer.setCancelEnabled( false );
